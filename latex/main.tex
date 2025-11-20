@@ -1,0 +1,181 @@
+% !TEX root = main.tex
+\documentclass[12pt,a4paper]{article}
+\usepackage[a4paper, top=3cm, bottom=3cm, left=3cm, right=3cm]{geometry}
+\usepackage{ragged2e}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage{float}
+\usepackage{graphicx} 
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage[spanish]{babel}
+\addto\captionsspanish{\renewcommand{\tablename}{Tabla}}
+\usepackage{float}       % para usar [H]
+\setlength{\textfloatsep}{10pt plus 2pt minus 4pt}  % reduce espacio vertical entre figuras y texto
+\usepackage{siunitx}
+\usepackage{sectsty}
+\usepackage{cleveref}
+\crefname{equation}{Ecuación}{Ecuaciones}
+\crefname{figure}{Figura}{Figuras}
+% Todas las secciones en Large
+\sectionfont{\Large}
+% Todas las subsecciones en large
+\subsectionfont{\small}
+\usepackage[colorlinks=true, linkcolor=blue, urlcolor=cyan, citecolor=magenta]{hyperref}
+
+\begin{document}
+\begin{titlepage}
+    \vspace*{2.5cm}
+    \centering
+    {\Huge\bfseries\centering Codificación de Huffman
+    \par}
+    \vspace{2.5cm}
+    {\scshape\Large Inferencia y Estimación\par}
+    \vspace{1cm}
+    {\scshape \textbf{Profesores:} Matías Perlin, Pau García Gulisano, Juan Ponce\par}
+    \vspace{1cm}
+    \includegraphics[width=0.2\textwidth]{logoudesa.png}\par\vspace{1cm}
+    {\scshape\LARGE Universidad de San Andrés \par}
+    \vfill
+    \begin{flushleft}
+    \textbf{Grupo 14 -- Integrantes:} \\
+    Alejandro Garcia Giacchetta -- Legajo 36245 -- agarciagiacchetta@udesa.edu.ar\\
+    Luciano Tchicourel -- Legajo 36573 -- ltchicourel@udesa.edu.ar\\
+    Julia Pantin -- Legajo 35721 -- jpantin@udesa.edu.ar \\
+    \vspace{2cm}
+    \end{flushleft}
+\end{titlepage}
+
+\section*{Resumen}
+
+El presente trabajo aborda el problema de la compresión sin pérdida de información mediante la implementación del algoritmo de \textit{codificación de Huffman}\cite{Huffman1952} aplicado a 3 fuentes de diversos orígenes, un texto sobre la mitología literaria, una tabla de datos, mayoritariamente numéricos, en formato \textit{CSV} y una cadena de bases del ADN. Para cada una de ellas se calcularon la longitud promedio de codificación $L_{\text{prom}}$, la entropía teórica \(H(X)\), la entropía normalizada $\eta$ y la reducción de memoria respecto de una codificación uniforme.
+
+La hipótesis de trabajo plantea que, para cada fuente analizada, se cumple que $|L_\text{prom} - H(X)| < 1 \text{ bit}$, en concordancia con los límites teóricos de la codificación de Huffman. Asimismo, se espera que el porcentaje de ahorro de memoria $S$ aumente de manera monótona con la concentración de probabilidad en un subconjunto reducido de símbolos dominantes; es decir, cuanto mayor sea la desigualdad en la distribución de $p(x)$, mayor será la compresibilidad relativa respecto de una codificación uniforme.
+
+El análisis cuantitativo de los resultados mostró que $L_\text{prom}$ se mantuvo próxima a \(H(X)\) en todos los casos considerados, con diferencias menores al orden de $10^{-2}~\text{bit}$. Asimismo, se observó una reducción de memoria entre 0~\% y 41,2~\% respecto de la codificación uniforme, siendo más pronunciada en los textos analizados con mayor redundancia de símbolos. La entropía normalizada mantuvo la misma tendencia monótona pero decreciente respecto a $|L_\text{prom} - H(X)|$, por lo cual podría servir de estimador para analizar la eficiencia de Huffman aplicado a una determinada fuente.
+
+\section*{Introducción}
+
+En la era digital, el volumen de información transmitida y almacenada crece de manera exponencial, lo que vuelve esencial el desarrollo de métodos eficientes de compresión de datos. En este contexto, la \textit{teoría de la información}, formulada por Claude E. Shannon en 1948 \cite{Shannon1948}, estableció un marco matemático para cuantificar la cantidad de información contenida en una fuente aleatoria. La noción de \textit{entropía} introducida por Shannon permite medir la incertidumbre promedio asociada a la aparición de los símbolos de una fuente y determina el límite teórico inferior para la longitud media de cualquier codificación sin pérdida de información afirmando que $H(X) \leq L < H(X) + 1$.
+
+En términos generales, los algoritmos de compresión sin pérdida buscan representar un conjunto de símbolos de forma más compacta sin alterar la información original. Entre ellos, la codificación de Huffman, propuesta por David A. Huffman en 1952 \cite{Huffman1952}, fue el aplicado a las fuentes de texto estudiadas.
+
+Para contrastar empíricamente las predicciones teóricas de la teoría de la información con el desempeño práctico del método de Huffman y comprobar la validez de la hipótesis se recurrió a distintas herramientas estadísticas e informáticas que se describen a continuación.
+
+En primer lugar, se estimó la \textit{probabilidad puntual} de que un carácter $x$ aparezca en un texto dado su frecuencia relativa de ocurrencias:
+\begin{equation}\label{eq:pmf}
+    p(x) = \frac{1}{N}\sum_{i=1}^{N} \mathbf{1}_{\{x_i = x\}},
+\end{equation}
+donde $N$ es la cantidad total de caracteres del texto y $\mathbf{1}_{\{x_i = x\}}$ es la función indicadora que vale $1$ si el símbolo observado $x_i$ coincide con $x$ y $0$ en caso contrario. 
+
+Cabe señalar que la probabilidad de ocurrencia $p(x)$ no es conocida a priori, sino que se estima a partir de la muestra finita que representa el texto analizado. En consecuencia, la frecuencia relativa $\hat{p}(x) = f(x)/N$ constituye el \textit{estimador de máxima verosimilitud (MLE)} de la probabilidad verdadera $p(x)$ bajo el modelo multinomial, al considerar cada carácter como una realización independiente de una fuente discreta de símbolos.
+
+A partir de esta distribución empírica se calculó la \textit{longitud promedio de bits} del código de Huffman:
+\begin{equation}\label{eq:longitud_promedio}
+    L = \sum_{i=1}^{N} p(x_i) \, l(x_i),
+\end{equation}
+donde $l(x_i)$ representa la cantidad de bits asignada al símbolo $x_i$ por el algoritmo de Huffman. Esta magnitud permite cuantificar la longitud esperada de codificación por símbolo.
+
+Asimismo, se definió el \textit{ahorro de memoria relativo} respecto de una codificación uniforme de longitud fija como:
+\begin{equation}\label{eq:space_saving}
+    S = \left( 1 - \frac{L}{L_{\text{uniforme}}} \right) \times 100~\%,
+\end{equation}
+donde $L_{\text{uniforme}} = \lceil \log_2 N_{\text{símbolos}} \rceil$ es la cantidad mínima de bits necesarios para codificar todos los símbolos con igual longitud. Esta medida expresa el porcentaje de espacio ahorrado al emplear codificación de longitud variable.
+
+Por otro lado, se calculó la \textit{entropía de Shannon}~\cite{Shannon1948}:
+\begin{equation}\label{eq:shannon_entropy}
+    H(X) = - \sum_{x \in \mathcal{X}} p(x)\log_2 p(x),
+\end{equation}
+que mide la incertidumbre promedio de la fuente y establece el límite teórico inferior para la longitud media de cualquier codificación sin pérdida. La comparación entre $H(X)$ y $L$ permite evaluar el grado de eficiencia de la codificación de Huffman implementada.
+
+Finalmente, para permitir la comparación entre textos con distinto tamaño del alfabeto, se empleó la \textit{entropía normalizada}:
+\begin{equation}\label{eq:normalized_entropy}
+    \eta = \frac{H(X)}{\log_2 N_{\text{símbolos}}},
+\end{equation}
+donde $N_{\text{símbolos}}$ es la cantidad de caracteres distintos presentes en el texto. Este cociente toma valores en el intervalo $[0,1]$ y refleja el grado relativo de desorden o uniformidad en la distribución de probabilidades: cuanto mayor es $\eta$, más uniforme es la fuente y menor será el potencial de compresión alcanzable.
+
+En las siguientes secciones se presentan los métodos computacionales que permitieron obtener los resultados empíricos y su análisis comparativo en función de las magnitudes definidas.
+
+\section*{Metodología}
+
+Como la distribución de probabilidad de ocurrencia de los caracteres es desconocida para cada texto, la probabilidad puntual fue estimada utilizando la Ecuación~\ref{eq:pmf} y la función \texttt{calcular\_probabilidades}, que computa la frecuencia relativa de cada símbolo presente en el archivo. Esta información permitió construir un diccionario de probabilidades $\hat{p}(x)$ para cada texto analizado, el cual constituye la base del proceso de codificación de Huffman.
+
+Continuando el análisis de las fuentes, se aprovecharon las distribuciones muestrales y se empleó la función \texttt{huffman\_code} provista por la cátedra para generar los códigos binarios correspondientes a cada carácter en cada fuente. La función \texttt{analizar\_codificacion} es la que genera la codificación de Huffman, las longitudes $l(x_i)$ asociado al i-ésimo símbolo, a partir del cual se calculó la longitud promedio de codificación mediante la Ecuación~\ref{eq:longitud_promedio}. La función también calcula la longitud para la codificación uniforme dada por la mínima longitud necesaria para representar los $N$ símbolos y el porcentaje de ahorro en memoria de Huffman respecto a la uniforme —Ecuación~\ref{eq:space_saving}. Luego, para cada texto se registraron los valores de entropía $H(X)$ por medio de la Ecuación~\ref{eq:shannon_entropy} y la función \texttt{calcular\_entropia}, computándose también $|L_\text{prom}-H|$. 
+Por último, se calculó la entropía normalizada $\eta$ por medio de la Ecuación~\ref{eq:normalized_entropy} y la función \texttt{entropia\_normalizada}.
+\section*{Resultados}
+
+Para visualizar los resultados se presentan los Gráficos \ref{fig:mito}, \ref{fig:tabla} y \ref{fig:adn}. El primero y el segundo en barras color verde, correspondientes a las fuentes \texttt{mitologia.txt} y \texttt{tabla.txt}, están representados en un digrama de Pareto con escala logarítmica dado que las difrencias entre la probabiliad máxima y mínima de cada uno vuelve la tendencia en la escala lineal indistinguible visualmente. En rojo se denota la curva de Pareto, marcando la distribución del $80\%$ de la muestra, para una futura observación. Por otro lado, la Figura~\ref{fig:adn} con barras azules, correspondiente a la fuente, \texttt{ADN.txt}, mantiene una proporción uniforme entre los 4 carácteres presentes, por lo que se optó por un gráfico convencional en escala lineal.
+
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{grafico_Mitología.pdf}
+    \caption{Distribución empírica de las probabilidades de aparición de caracteres en el texto \texttt{mitologia.txt}. Se observa que cerca del 80~\% de la masa de probabilidad se concentra en un conjunto reducido de letras frecuentes, lo que evidencia la redundancia característica del lenguaje natural y justifica la eficiencia del algoritmo de Huffman en este tipo de fuentes. Se puede observar, también que el decaimiento de la probabilidad parece seguir una tendencia lineal en la escala logarítmica lo que apunta a una relación exponencial en la escala lineal.}
+    \label{fig:mito}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{grafico_Tabla.pdf}
+    \caption{Distribución empírica de las probabilidades de aparición de caracteres en el texto \texttt{tabla.txt}. Se observa una concentración de la masa de probabilidad en caracteres numéricos y una dispersión más uniforme entre el resto de los símbolos, característico de fuentes de datos tabulares o numéricos.}
+    \label{fig:tabla}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.8\linewidth]{grafico_ADN.pdf}
+    \caption{Distribución empírica de las probabilidades de aparición de caracteres en el texto \texttt{adn.txt}. La probabilidad de cada base (\texttt{A}, \texttt{T}, \texttt{C}, \texttt{G}) es prácticamente uniforme, lo que indica una fuente sin redundancia estadística y con entropía máxima. En este caso, el algoritmo de Huffman no produce una reducción apreciable en la longitud promedio de codificación.}
+    \label{fig:adn}
+\end{figure}
+
+Como análisis de los resultados gráficos se puede anticipar que el grado de compresibilidad de cada fuente está determinado por la forma de su distribución de probabilidades, cuanto más redundante sea la información del texto, mayor será la diferencia entre $L_{\text{unif}}$ y $L_{\text{prom}}$, y más evidente se volverá la relación teórica $H(X) \leq L < H(X) + 1$.
+
+Para evidenciarlo estadísticamente, los resultados del análisis completo se muestran en la Tabla~\ref{tab:analisis_completo}.
+
+
+\begin{table}[H]
+    \centering
+    
+    % Se mantiene la alineación decimal con S[table-format]
+    \begin{tabular}{l
+                S[table-format=1.6]
+                S[table-format=1.0]
+                S[table-format=2.4]
+                S[table-format=1.6]
+                c
+                S[table-format=1.4]}
+        \toprule
+        \textbf{Fuente} & {\boldmath$L_{\text{prom}}\,\text{[b]}$} & {\boldmath$L_{\text{unif}}\,\text{[b]}$} & {\boldmath{$\text{S}\,[\%]$} } &{\boldmath{$H(X)\,\text{[b]}$}} & {\boldmath{$|L_\text{prom} - H(X)|\,\text{[b]}$}} & {\boldmath$\eta\,\text{[b]}$} \\
+        \midrule
+        Mitología & $4.366182$ & $6$ & $27.2302$ & $4.3329$ & $3.3205\times10^{-2}$ & $0.7365$ \\
+        Tabla     & $3.530120$ & $6$ & $41.1646$ & $3.4808$ & $4.9263\times10^{-2}$ & $0.6106$ \\
+        ADN       & $2.000000$ & $2$ & $0.0000$ & $1.9999$ & $8.0775\times10^{-7}$ & $1.0000$ \\
+        \bottomrule
+    \end{tabular}
+    \caption{Análisis Completo de Eficiencia de Codificación. La unidad $[b]$ corresponde a bits. Se puede analizar que en \texttt{mitologia.txt}, la fuerte asimetría de frecuencias permite una reducción aproximada del $27.2\,\%$ respecto de la codificación uniforme, con $L_{\text{prom}} \approx 4.37$. El mayor porcentaje de ahorro se alcanza en \texttt{tabla.txt}, dado que la menor concentración de probabilidades genera una compresión intermedia del $41.2\,\%$. En cambio, en \texttt{adn.txt}, con cuatro símbolos equiprobables, $L_{\text{prom}} = L_{\text{unif}} = 2$ y el ahorro es nulo, evidenciando una fuente sin redundancia.}
+    \label{tab:analisis_completo}
+\end{table}
+
+Como la entropía $H(X)$ depende del tamaño del alfabeto de cada fuente, su valor absoluto no permite comparaciones directas entre textos con distinto número de símbolos. La entropía normalizada refleja la uniformidad relativa de la distribución de caracteres y nos indica que los textos con mayor uniformidad presentaron valores de $\eta$ más altos, lo que implica menor potencial de compresión. En cambio, los textos con estructura más repetitiva mostraron $\eta$ más bajos, reflejando una mayor redundancia y, consecuentemente, un mayor ahorro de espacio.
+
+
+Por otra parte, queda en evidencia que la longitud promedio $L$ se aproxima a la entropía $H(X)$ en todos los casos, cumpliendo la desigualdad teórica $H(X) \leq L < H(X) + 1$. La diferencia $|L-H|$ es mayor para \texttt{tabla.txt}, $\eta$ es el menor y el porcentaje de ahorro el mayor. Con un ahorro nulo y $\eta$ prácticamente 1, \texttt{adn.txt} presenta una diferencia $|L-H|$ significativamente menor al texto anteriormente mencionado.
+
+\section*{Conclusiones}
+
+El estudio experimental realizado permitió validar empíricamente los principios de la teoría de la información y la eficiencia del algoritmo de Huffman en la compresión sin pérdida de datos, el cual se aproxima con alta precisión al límite teórico, demostrando su eficacia en la reducción de información redundante.
+
+Los resultados confirmaron la hipótesis de trabajo: en todos los casos, la longitud promedio de codificación ($L_{\text{prom}}$) se mantuvo muy próxima a la entropía teórica ($H(X)$), cumpliendo la desigualdad $H(X) \le L < H(X) + 1$. Las diferencias fueron menores al orden de $10^{-2}~\text{bit}$, lo que evidencia la eficiencia de la aproximación del método de Huffman al límite teórico de Shannon.
+
+Asimismo, se observó que el potencial de compresión depende directamente de la estructura probabilística de la fuente. Las distribuciones más sesgadas —como en \texttt{tabla.txt}— presentaron menor entropía normalizada ($\eta \approx 0.61$) y mayores ahorros de memoria ($S \approx 41,2\%$), mientras que fuentes uniformes —como \texttt{adn.txt}— mostraron $\eta \approx 1$ y $S = 0\%$, reflejando la ausencia de redundancia estadística.
+
+Una posible continuación del trabajo realizado podría enfocarse en analizar la relación entre $\eta$ y $S$ a partir de un conjunto de fuentes mayor en cantidad y variedad, simulando diferentes escenarios de uso de caracteres. 
+
+\bibliographystyle{plain}
+\bibliography{referencias}
+\end{document}
+
+Como punto de comparación, puede considerarse una \textit{codificación uniforme} o de longitud fija, en la cual todos los símbolos se representan con la misma cantidad de bits. Si el alfabeto contiene $N_{\text{símbolos}}$ símbolos distintos, la longitud mínima necesaria por símbolo está dada por $\log_2 N_{\text{símbolos}}$ bits (redondeada al entero superior). Este esquema constituye el caso base de referencia: cualquier código variable, como el de Huffman, será más eficiente únicamente si logra una longitud media $L$ inferior a dicha longitud uniforme.
+
+Desde el punto de vista teórico, si una fuente genera símbolos con probabilidades $p(x_i)$, la entropía $H(X)$ representa la longitud promedio mínima posible (en bits por símbolo) de un código sin pérdida. La longitud media efectivamente alcanzada por el algoritmo de Huffman, denotada $L$, se espera próxima a este límite, cumpliendo la desigualdad $H(X) \leq L < H(X) + 1$. Así, la comparación entre ambas magnitudes permite evaluar cuantitativamente el grado de eficiencia del método y la influencia de la redundancia estadística en la capacidad de compresión.
